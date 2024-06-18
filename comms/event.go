@@ -3,7 +3,8 @@ package comms
 
 import (
 	"encoding/json" // Package for JSON encoding and decoding
-	"time"          // Package for time-related functions
+	"fmt"
+	"time" // Package for time-related functions
 
 	"github.com/google/uuid" // Package for generating and working with UUIDs
 )
@@ -14,6 +15,9 @@ const (
 	StatusSent         = 1 // Sent status
 	StatusDelivered    = 2 // Delivered status
 	StatusAcknowledged = 3 // Acknowledged status
+
+	EventTypeMessage  = "message"
+	EventTypeJoinRoom = "join_room"
 )
 
 // DeliveryStatus represents the delivery status of a message.
@@ -24,9 +28,9 @@ type DeliveryStatus struct {
 
 // Event represents a communication event.
 type Event struct {
-	ID uuid.UUID `json:"id"` // Unique identifier for the event
+	ID   uuid.UUID `json:"id"`   // Unique identifier for the event
+	Type string    `json:"type"` // Type of event
 
-	RoomID   uuid.UUID `json:"roomId"`   // ID of the room where the event occurred
 	SenderID uuid.UUID `json:"senderId"` // ID of the sender of the event
 
 	Payload []byte `json:"payload"` // Payload of the event
@@ -37,7 +41,17 @@ type Event struct {
 
 // populate sets the ServerTime of the event to the current time.
 func (event *Event) populate() {
+	event.ID = uuid.New()
 	event.ServerTime = time.Now()
+}
+
+func (event *Event) validate() error {
+	switch event.Type {
+	case EventTypeMessage, EventTypeJoinRoom:
+		return nil
+	default:
+		return fmt.Errorf("invalid event type %s", event.Type)
+	}
 }
 
 // toBytes serializes the Event object to a JSON byte slice.
