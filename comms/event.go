@@ -2,11 +2,12 @@
 package comms
 
 import (
-	"encoding/json" // Package for JSON encoding and decoding
+	"encoding/json"
 	"fmt"
-	"time" // Package for time-related functions
+	"time"
 
-	"github.com/google/uuid" // Package for generating and working with UUIDs
+	// Package for generating and working with UUIDs
+	"github.com/google/uuid"
 )
 
 // Constants representing different delivery statuses.
@@ -31,12 +32,16 @@ type Event struct {
 	ID   uuid.UUID `json:"id"`   // Unique identifier for the event
 	Type string    `json:"type"` // Type of event
 
-	SenderID uuid.UUID `json:"senderId"` // ID of the sender of the event
+	// ID of the sender of the event
+	SenderID uuid.UUID `json:"senderId"`
 
-	Payload []byte `json:"payload"` // Payload of the event
+	// Payload of the event
+	Payload []byte `json:"payload"`
 
-	SenderTime time.Time `json:"senderTime"` // Time when the event was sent by the sender
-	ServerTime time.Time `json:"serverTime"` // Time when the event was received by the server
+	// Time when the event was sent by the sender
+	SenderTime time.Time `json:"senderTime"`
+	// Time when the event was received by the server
+	ServerTime time.Time `json:"serverTime"`
 }
 
 // populate sets the ServerTime of the event to the current time.
@@ -59,13 +64,17 @@ func (event *Event) toBytes() ([]byte, error) {
 	return json.Marshal(event)
 }
 
-// EventFromBytes deserializes a JSON byte slice into an Event object and populates its ServerTime.
+// EventFromBytes deserializes a JSON byte slice into an Event object
+// and populates its ServerTime.
 func EventFromBytes(packet []byte) (event *Event, err error) {
-	err = json.Unmarshal(packet, event) // Deserialize the JSON byte slice into the Event object
+	// Deserialize the JSON byte slice into the Event object
+	err = json.Unmarshal(packet, event)
 	if err != nil {
-		return nil, err // Return error if deserialization fails
+		// Return error if deserialization fails
+		return nil, err
 	}
 
-	event.populate()  // Set the ServerTime to the current time
-	return event, nil // Return the deserialized and populated Event object
+	// Set the ServerTime to the current time
+	event.populate()
+	return event, nil
 }

@@ -1,4 +1,3 @@
-// Package utils provides utility functions and types for application configuration.
 package utils
 
 import (
@@ -24,7 +23,10 @@ func NewLogger() *zap.Logger {
 		// Check for errors during logger initialization
 		if logInitErr != nil {
 			// Log fatal error and exit if logger initialization fails
-			log.Fatalf("Failed to initialise structured logging %#v", logInitErr)
+			log.Fatalf(
+				"Failed to initialise structured logging %#v",
+				logInitErr,
+			)
 		}
 	})
 
