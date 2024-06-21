@@ -126,6 +126,7 @@ func (h *Hub) Start() {
 	)
 
 	go h.startRegistry()
+	go readPump()
 	h.httpServer.Run(fmt.Sprintf(":%s", h.config.Port))
 }
 
@@ -148,7 +149,6 @@ func NewHub(config *utils.Config, logger *zap.Logger) *Hub {
 	}
 
 	h.httpServer = newHTTPServer(h)
-	go readPump()
 	return h
 }
 

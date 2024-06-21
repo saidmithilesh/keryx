@@ -28,7 +28,7 @@ func readPump() {
 			if conn == nil {
 				break
 			}
-			if _, _, err := wsutil.ReadClientData(conn); err != nil {
+			if msg, _, err := wsutil.ReadClientData(conn); err != nil {
 				if err := h.RemoveConn(conn); err != nil {
 					h.logger.Error(
 						"failed to remove connection",
@@ -39,6 +39,10 @@ func readPump() {
 			} else {
 				// This is commented out since in demo usage, stdout is showing
 				// messages sent from > 1M connections at very high rate
+				h.logger.Info(
+					"new message received",
+					zap.String("message", string(msg)),
+				)
 			}
 		}
 	}

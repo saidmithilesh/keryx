@@ -1,0 +1,12 @@
+services:
+  goapp:
+    build: .
+    volumes:
+      - .:/app # Mount the current directory to /app in the container
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=${ENV}
+      - PORT=${PORT}
+      - HUB_REGISTRY_INTERVAL=${HUB_REGISTRY_INTERVAL}
+    command: "go run main.go"
