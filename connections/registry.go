@@ -8,6 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	RegPrefix = "reg"
+)
+
 type HubRegistry struct {
 	hubID  uuid.UUID
 	config *utils.Config
