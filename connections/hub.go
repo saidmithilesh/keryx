@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gobwas/ws"
@@ -26,6 +25,8 @@ type Hub struct {
 	config *utils.Config
 	logger *zap.Logger
 
+	registry *HubRegistry
+
 	httpServer *gin.Engine
 
 	stop   chan struct{}
@@ -37,32 +38,6 @@ type Hub struct {
 
 	userFDMap map[string]int
 	fdUserMap map[int]string
-}
-
-func (h *Hub) startRegistry() {
-	h.logger.Info(
-		"starting hub registry heartbeat",
-		zap.String("hubId", h.ID.String()),
-		zap.Int("registryInterval", int(h.config.RegistryInterval.Seconds())),
-	)
-
-	ticker := time.NewTicker(h.config.RegistryInterval)
-	for {
-		select {
-		case <-ticker.C:
-			h.logger.Info(
-				"hub registry heartbeat",
-				zap.String("hubId", h.ID.String()),
-			)
-		case <-h.stop:
-			ticker.Stop()
-			h.logger.Info(
-				"stopping hub registry heartbeat",
-				zap.String("hubId", h.ID.String()),
-			)
-			return
-		}
-	}
 }
 
 func (h *Hub) AddConn(userID string, conn net.Conn) error {
@@ -193,7 +168,7 @@ func (h *Hub) Start() {
 		zap.String("port", h.config.Port),
 	)
 
-	go h.startRegistry()
+	go h.registry.start()
 	go h.readPump()
 	go h.writePump()
 	h.httpServer.Run(fmt.Sprintf(":%s", h.config.Port))
@@ -211,10 +186,13 @@ func NewHub(
 		logger.Fatal("failed to initialise hub", zap.Error(err))
 	}
 
+	hid := uuid.New()
+
 	h = &Hub{
-		ID:          uuid.New(),
+		ID:          hid,
 		config:      config,
 		logger:      logger,
+		registry:    NewHubRegistry(config, logger, hid),
 		stop:        make(chan struct{}),
 		router:      router,
 		fd:          fd,
