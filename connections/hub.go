@@ -1,6 +1,7 @@
 package connections
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -9,10 +10,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 
+	"keryx/comms"
 	"keryx/utils"
 )
 
@@ -24,11 +28,15 @@ type Hub struct {
 
 	httpServer *gin.Engine
 
-	stop chan struct{}
+	stop   chan struct{}
+	router *comms.Router
 
 	fd          int
 	connections map[int]net.Conn
 	lock        *sync.RWMutex
+
+	userFDMap map[string]int
+	fdUserMap map[int]string
 }
 
 func (h *Hub) startRegistry() {
@@ -57,7 +65,7 @@ func (h *Hub) startRegistry() {
 	}
 }
 
-func (h *Hub) AddConn(conn net.Conn) error {
+func (h *Hub) AddConn(userID string, conn net.Conn) error {
 	connFD := getWSFD(conn)
 	err := unix.EpollCtl(
 		h.fd,
@@ -68,7 +76,11 @@ func (h *Hub) AddConn(conn net.Conn) error {
 			Fd:     int32(connFD),
 		},
 	)
+	h.userFDMap[userID] = connFD
+	h.fdUserMap[connFD] = userID
 	if err != nil {
+		delete(h.userFDMap, userID)
+		delete(h.fdUserMap, connFD)
 		return err
 	}
 
@@ -114,6 +126,62 @@ func (h *Hub) Wait() ([]net.Conn, error) {
 	return connections, nil
 }
 
+func (h *Hub) readPump() {
+	for {
+		connections, err := h.Wait()
+		if err != nil {
+			h.logger.Error("failed to epoll wait", zap.Error(err))
+			continue
+		}
+		for _, conn := range connections {
+			if conn == nil {
+				break
+			}
+			if msg, _, err := wsutil.ReadClientData(conn); err != nil {
+				if err := h.RemoveConn(conn); err != nil {
+					h.logger.Error(
+						"failed to remove connection",
+						zap.Error(err),
+					)
+				}
+				conn.Close()
+			} else {
+				// This is commented out since in demo usage, stdout is showing
+				// messages sent from > 1M connections at very high rate
+				h.logger.Info(
+					"new message received",
+					zap.String("message", string(msg)),
+				)
+				go h.router.Route(msg)
+			}
+		}
+	}
+}
+
+func (h *Hub) writePump() {
+	for {
+		resp := <-h.router.Output
+		userID := resp.SenderID.String()
+		fd := h.userFDMap[userID]
+		message, err := json.Marshal(resp)
+		if err != nil {
+			h.logger.Error(
+				"failed to convert router response to bytes",
+				zap.Error(err),
+			)
+			continue
+		}
+		err = wsutil.WriteServerMessage(h.connections[fd], ws.OpBinary, message)
+		if err != nil {
+			h.logger.Error(
+				"failed to send message to client",
+				zap.Error(err),
+			)
+			continue
+		}
+	}
+}
+
 func (h *Hub) Stop() {
 	close(h.stop)
 }
@@ -126,13 +194,18 @@ func (h *Hub) Start() {
 	)
 
 	go h.startRegistry()
-	go readPump()
+	go h.readPump()
+	go h.writePump()
 	h.httpServer.Run(fmt.Sprintf(":%s", h.config.Port))
 }
 
 var h *Hub
 
-func NewHub(config *utils.Config, logger *zap.Logger) *Hub {
+func NewHub(
+	config *utils.Config,
+	logger *zap.Logger,
+	router *comms.Router,
+) *Hub {
 	fd, err := unix.EpollCreate1(0)
 	if err != nil {
 		logger.Fatal("failed to initialise hub", zap.Error(err))
@@ -143,9 +216,12 @@ func NewHub(config *utils.Config, logger *zap.Logger) *Hub {
 		config:      config,
 		logger:      logger,
 		stop:        make(chan struct{}),
+		router:      router,
 		fd:          fd,
 		connections: make(map[int]net.Conn),
 		lock:        &sync.RWMutex{},
+		userFDMap:   make(map[string]int),
+		fdUserMap:   make(map[int]string),
 	}
 
 	h.httpServer = newHTTPServer(h)

@@ -9,17 +9,18 @@ import (
 )
 
 const (
+	StatusCodeSucess           = 90000
 	StatusCodeInvalidPacket    = 90001
 	StatusCodeInvalidSender    = 90002
 	StatusCodeInvalidEventType = 90003
 )
 
 type RoutingStatus struct {
-	EventID    uuid.UUID
-	SenderID   uuid.UUID
-	Success    bool
-	StatusCode int
-	Reason     string
+	EventID    uuid.UUID `json:"eventId"`
+	SenderID   uuid.UUID `json:"senderId"`
+	Success    bool      `json:"success"`
+	StatusCode int       `json:"statusCode"`
+	Reason     string    `json:"reason"`
 }
 
 func invalidPacketError(event *Event) *RoutingStatus {
@@ -42,36 +43,50 @@ func invalidEventTypeError(event *Event) *RoutingStatus {
 	}
 }
 
+func routingSuccess(event *Event) *RoutingStatus {
+	return &RoutingStatus{
+		EventID:    event.ID,
+		SenderID:   event.SenderID,
+		Success:    true,
+		StatusCode: StatusCodeSucess,
+		Reason:     "sent successfully",
+	}
+}
+
 type Router struct {
 	config *utils.Config
 	logger *zap.Logger
 
-	outputChan chan *RoutingStatus
+	Output chan *RoutingStatus
 }
 
 func (router *Router) Route(packet []byte) {
 	event, err := EventFromBytes(packet)
 	if err != nil {
-		router.logger.Error("failed to deserialize data on channel")
-		router.outputChan <- invalidPacketError(event)
+		router.logger.Error(
+			"failed to deserialize data on channel",
+			zap.Error(err),
+		)
+		router.Output <- invalidPacketError(event)
 		return
 	}
 
 	err = event.validate()
 	if err != nil {
 		router.logger.Error("event validation failed", zap.Error(err))
-		router.outputChan <- invalidEventTypeError(event)
+		router.Output <- invalidEventTypeError(event)
 	}
+
+	router.Output <- routingSuccess(event)
 }
 
 func NewRouter(
 	config *utils.Config,
 	logger *zap.Logger,
-	outputChan chan *RoutingStatus,
 ) (router *Router) {
 	return &Router{
-		config:     config,
-		logger:     logger,
-		outputChan: outputChan,
+		config: config,
+		logger: logger,
+		Output: make(chan *RoutingStatus, 256),
 	}
 }

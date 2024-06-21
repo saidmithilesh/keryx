@@ -68,6 +68,7 @@ func (event *Event) toBytes() ([]byte, error) {
 // and populates its ServerTime.
 func EventFromBytes(packet []byte) (event *Event, err error) {
 	// Deserialize the JSON byte slice into the Event object
+	event = &Event{}
 	err = json.Unmarshal(packet, event)
 	if err != nil {
 		// Return error if deserialization fails

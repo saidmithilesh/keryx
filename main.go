@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"time"
 
+	"keryx/comms"
 	"keryx/connections"
 	"keryx/utils"
 
@@ -48,7 +49,8 @@ func main() {
 	logger := utils.NewLogger()
 
 	logger.Info("logger initialised", zap.String("environment", config.Env))
-	hub := connections.NewHub(config, logger)
+	router := comms.NewRouter(config, logger)
+	hub := connections.NewHub(config, logger, router)
 
 	go handleInterrupt(sigChan, hub, logger)
 	hub.Start()
