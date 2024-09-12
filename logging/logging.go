@@ -16,11 +16,12 @@ var logger *zap.Logger
 // buildProdctionLogger creates a new production logger
 // with JSON encoding and log to stderr.
 func buildProdctionLogger() *zap.Logger {
-	// Configure the encoder
+	// NewProductionEncoderConfig returns an opinionated EncoderConfig for production environments.
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"                   // Change the default time key to timestamp
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder // Use ISO8601 time format for timestamp
 
+	// Get the hostname of the machine
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
@@ -35,7 +36,7 @@ func buildProdctionLogger() *zap.Logger {
 		Encoding:          "json",                              // Use JSON encoding for logs in production
 		EncoderConfig:     encoderCfg,                          // Use the custom encoder configuration
 		OutputPaths: []string{
-			"stderr", // Log to stderr in production
+			"stdout", // Log to stdout in production
 		},
 		ErrorOutputPaths: []string{
 			"stderr", // Log errors to stderr in production
