@@ -37,6 +37,8 @@ type Hub struct {
 	logger    *zap.Logger
 	connStore *ConnStore
 	upgrader  websocket.Upgrader
+
+	onMessage func([]byte, string)
 }
 
 func (hub *Hub) Register(r *http.Request, w http.ResponseWriter) {
@@ -52,6 +54,10 @@ func (hub *Hub) Register(r *http.Request, w http.ResponseWriter) {
 	connID := uuid.New().String()
 	go hub.readPump(userID, connID, conn)
 	hub.connStore.AddConnection(userID, connID, conn)
+}
+
+func (hub *Hub) SetMessageListener(listener func([]byte, string)) {
+	hub.onMessage = listener
 }
 
 func (hub *Hub) readPump(userID string, connID string, conn *websocket.Conn) {
@@ -75,6 +81,7 @@ func (hub *Hub) readPump(userID string, connID string, conn *websocket.Conn) {
 			break
 		}
 		hub.logger.Info("Received message", zap.String("message", string(message)))
+		go hub.onMessage(message, userID)
 	}
 }
 
